@@ -1,0 +1,110 @@
+<!-- Local rules -->
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- ========================= -->
+<!-- Local SSH / Syslog rules  -->
+<!-- ========================= -->
+<group name="local,syslog,sshd,">
+
+  <!-- Example: match a specific source IP for ssh auth failures -->
+  <rule id="100001" level="5">
+    <if_sid>5716</if_sid>
+    <srcip>1.1.1.1</srcip>
+    <description>sshd: authentication failed from IP 1.1.1.1.</description>
+    <group>sshd,authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5</group>
+  </rule>
+
+</group>
+
+<!-- ========================= -->
+<!-- Web recon / path scanning -->
+<!-- ========================= -->
+<group name="local,web,nginx,">
+
+  <!-- Triggers when Wazuh already decoded it as a web event (depends on your ruleset) -->
+    <rule id="100100" level="10">
+    <if_sid>31101</if_sid>
+    <field name="data.url">/wp-login\.php|/phpmyadmin|/\.git/|/admin</field>
+    <description>Web scan: suspicious path requested (wp-login/phpmyadmin/.git/admin)</description>
+    <mitre>
+      <id>T1595</id>
+    </mitre>
+    <group>web,attack,recon</group>
+  </rule>
+
+  <!-- Fallback: if field parsing differs, match raw log line -->
+  <rule id="100101" level="10">
+    <if_sid>31101</if_sid>
+    <match>/wp-login\.php|/phpmyadmin|/\.git/|/admin</match>
+    <description>Web scan (fallback): suspicious path found in full_log</description>
+    <mitre>
+      <id>T1595</id>
+    </mitre>
+    <group>web,attack,recon</group>
+  </rule>
+
+</group>
+
+<!-- ========================= -->
+<!-- SQLi (chain from 31164)   -->
+<!-- ========================= -->
+<group name="local,web,attack,sqli,">
+  <rule id="100200" level="12">
+    <if_sid>31164</if_sid>
+    <description>Possible SQL injection attempt in HTTP request (correlated from Wazuh SQLi rule)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,attack,sqli,correlation</group>
+  </rule>
+
+  <rule id="100201" level="10">
+    <if_sid>31106</if_sid>
+    <description>Web attack returned HTTP 200 (success) — review request details</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,attack,success</group>
+  </rule>
+
+  <rule id="100202" level="10">
+    <if_group>web,accesslog</if_group>
+    <match>sleep\\(|benchmark\\(|information_schema</match>
+    <description>Suspicious DB fingerprinting/time-based SQLi keywords in HTTP request</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,attack,sqli</group>
+  </rule>
+</group>
+
+<group name="flaskapp,web,visibility,">
+  <rule id="110010" level="3">
+    <location>/var/log/flaskapp/app.log</location>
+    <match>"event":"http_request"</match>
+    <description>Flask app request (JSON log) - visibility</description>
+    <group>flaskapp,web,visibility</group>
+  </rule>
+</group>
+
+<group name="pfsense,syslog,">
+  <rule id="120100" level="3">
+    <location>/var/log/pfsense.log</location>
+    <description>pfSense syslog received (visibility rule)</description>
+    <group>pfsense,syslog,visibility</group>
+  </rule>
+</group>
+
+<group name="flaskapp,web,detections,sqli,">
+  <rule id="110200" level="10">
+    <if_group>flaskapp</if_group>
+    <field name="data.path">/search</field>
+    <field name="data.query_string">OR%201%3D1|UNION|SELECT|%27</field>
+    <description>Possible SQL injection attempt in /search query string</description>
+    <group>flaskapp,web,sqli,attack</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+</group>
